@@ -229,31 +229,57 @@ body {
 @media (max-width: 768px) {
   .modal-content {
     width: 95vw;
-    height: 90vh;
+    height: 85vh;
     aspect-ratio: unset; /* Remove aspect ratio constraint */
-    max-height: 90vh;
+    max-height: 85vh;
     border-radius: 15px;
-  }
-  
-  .modal-content {
-    padding: 2rem 1.5rem 1.5rem 1.5rem;
+    padding: 2.5rem 1.5rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
   }
   
   #modal-title {
-    font-size: 1.2rem;
+    font-size: 1.3rem;
     margin-bottom: 1rem;
+    flex-shrink: 0; /* Prevent title from shrinking */
   }
   
   .readme-content {
-    max-height: 70vh; /* More space for content on mobile */
-    font-size: 0.9rem;
-    line-height: 1.5;
+    flex: 1; /* Take up remaining space */
+    max-height: none; /* Remove fixed height constraint */
+    font-size: 1rem; /* Slightly larger font */
+    line-height: 1.6;
+    overflow-y: auto;
+    padding-right: 0.5rem; /* Space for scrollbar */
   }
   
-  .readme-content h1 { font-size: 1.2rem; }
-  .readme-content h2 { font-size: 1.1rem; }
-  .readme-content h3 { font-size: 1rem; }
-  .readme-content h4, .readme-content h5, .readme-content h6 { font-size: 0.9rem; }
+  .readme-content h1 { font-size: 1.4rem; margin-top: 1rem; margin-bottom: 0.8rem; }
+  .readme-content h2 { font-size: 1.25rem; margin-top: 1rem; margin-bottom: 0.7rem; }
+  .readme-content h3 { font-size: 1.1rem; margin-top: 0.8rem; margin-bottom: 0.6rem; }
+  .readme-content h4, .readme-content h5, .readme-content h6 { font-size: 1rem; margin-top: 0.6rem; margin-bottom: 0.5rem; }
+  
+  .readme-content p {
+    margin-bottom: 1rem;
+  }
+  
+  .readme-content code {
+    font-size: 0.9rem;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .readme-content pre {
+    font-size: 0.85rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+  }
+  
+  #modal-links {
+    flex-shrink: 0; /* Prevent links from shrinking */
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(143, 194, 143, 0.3);
+  }
   
   .close-btn {
     font-size: 1.5rem;
@@ -562,6 +588,14 @@ body {
   
   .dark-theme .readme-content {
     color: #e0e0e0;
+  }
+  
+  .dark-theme #modal-links {
+    border-top-color: rgba(143, 194, 143, 0.3);
+  }
+  
+  .dark-theme .close-btn {
+    color: #8fc28f;
   }
 }
   

@@ -51,6 +51,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalReadme = document.getElementById('modal-readme');
     const modalLinks = document.getElementById('modal-links');
     
+    /** Decode GitHub API base64 README content as UTF-8 (atob alone corrupts non-ASCII). */
+    function decodeGitHubReadmeContent(base64) {
+        const cleaned = base64.replace(/\s/g, '');
+        const binary = atob(cleaned);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return new TextDecoder('utf-8').decode(bytes);
+    }
+
     // Function to fetch README from GitHub
     async function fetchGitHubReadme(username, repo) {
         try {
@@ -59,8 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
-            const content = atob(data.content); // Decode base64
-            return content;
+            return decodeGitHubReadmeContent(data.content);
         } catch (error) {
             console.error('Error fetching README:', error);
             return `# ${repo}\n\nError loading README from GitHub. Please visit the repository directly to view project details.\n\n**Error:** ${error.message}`;

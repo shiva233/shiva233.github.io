@@ -8,6 +8,11 @@ Scrolling moves through education, experience, projects, and contact details.
 The card returns with the idle loop at the end. Reduced-motion settings receive
 a static opening and normal document scrolling.
 
+The videos use streaming-friendly H.264 at full 1080p resolution. The idle loop
+downloads only after assembly is buffered. Slow downloads keep waiting while
+data arrives; stalled or interrupted playback gets two automatic reload attempts
+before offering a manual retry. Switching tabs invalidates old playback requests.
+
 ## Preview and edit
 
 With Node.js installed:

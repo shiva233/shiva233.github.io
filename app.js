@@ -18,7 +18,8 @@ const controls = document.querySelector('.hero-controls');
 const clamp = (x, lo=0, hi=1) => Math.max(lo, Math.min(hi, x));
 const ease = x => {x=clamp(x); return x*x*(3-2*x)};
 let complete=false, scheduled=false, introTop=0, introTravel=1, outroTop=0, outroTravel=1;
-let watchdog, playbackGeneration=0;
+let watchdog, recoveryTimer, playbackGeneration=0, playAttempt=0, recoveryCount=0;
+let resumeAt=0, lastPlaybackTime=0, lastBufferedEnd=0, gestureRequired=false;
 let outroOnScreen=false;
 function syncOutroPlayback(){
   if(!outroOnScreen||document.hidden||reducedMotion.matches){
@@ -69,7 +70,7 @@ async function playIdle(){
 }
 function finishAssembly(fallback=false){
   if(complete)return;
-  complete=true;clearTimeout(watchdog);video.pause();
+  complete=true;stopAssemblyPlayback();
   root.classList.remove('intro-locked');
   stage.classList.remove('autoplay-blocked');stage.classList.add('assembly-ready');
   start.hidden=true;controls.hidden=false;
@@ -79,33 +80,58 @@ function finishAssembly(fallback=false){
   measure();schedule();
 }
 function offerAssemblyStart(retry=false){
-  clearTimeout(watchdog);
+  stopAssemblyPlayback();
   if(complete)return;
-  video.pause();start.hidden=false;
+  gestureRequired=!retry;
+  start.hidden=false;
   start.textContent=retry?'Retry animation ▷':'Play animation ▷';
   stage.classList.add('autoplay-blocked');
 }
-function watchPlayback(){clearTimeout(watchdog);watchdog=setTimeout(()=>offerAssemblyStart(true),20000)}
-async function playAssembly(){
+function stopAssemblyPlayback(){
+  // pause()/load() reject pending play promises, sometimes after the tab returns.
+  // Invalidate those promises before pausing so they cannot replace a newer attempt.
+  playAttempt++;clearTimeout(watchdog);clearTimeout(recoveryTimer);recoveryTimer=undefined;
+  video.pause();
+}
+function watchPlayback(){
+  clearTimeout(watchdog);
+  if(!complete&&!document.hidden&&start.hidden)watchdog=setTimeout(recoverAssembly,30000);
+}
+function recoverAssembly(){
+  if(complete||document.hidden||recoveryTimer!==undefined||!start.hidden)return;
+  stopAssemblyPlayback();
+  if(recoveryCount>=2){offerAssemblyStart(true);return}
+  recoveryCount++;
+  recoveryTimer=setTimeout(()=>{recoveryTimer=undefined;playAssembly(true)},500*recoveryCount);
+}
+async function playAssembly(reload=false){
   if(reducedMotion.matches){finishAssembly(true);return}
   // Never spend the opening (or its loading timeout) in a background tab.
   if(document.hidden||complete)return;
-  const generation=playbackGeneration;
+  const attempt=++playAttempt;
+  gestureRequired=false;
+  clearTimeout(recoveryTimer);recoveryTimer=undefined;
   video.muted=true;video.defaultMuted=true;
-  if(video.error)video.load();
+  if(reload||video.error){
+    resumeAt=Math.max(resumeAt,video.currentTime||0);
+    lastBufferedEnd=0;video.load();
+  }
+  video.defaultPlaybackRate=1.5;video.playbackRate=1.5;
   start.hidden=true;stage.classList.remove('autoplay-blocked');
   watchPlayback();
   try{
     await video.play();
-    if(generation!==playbackGeneration)return;
+    if(attempt!==playAttempt)return;
     if(document.hidden||complete){video.pause();clearTimeout(watchdog)}
   }
   catch(error){
-    if(complete||document.hidden||generation!==playbackGeneration)return;
-    offerAssemblyStart(error.name!=='NotAllowedError');
+    if(complete||document.hidden||attempt!==playAttempt)return;
+    if(error.name==='NotAllowedError')offerAssemblyStart();
+    else recoverAssembly();
   }
 }
 function replayAssembly(){
+  stopAssemblyPlayback();recoveryCount=0;resumeAt=0;lastPlaybackTime=0;lastBufferedEnd=0;
   playbackGeneration++;complete=false;idle.pause();idle.currentTime=0;
   controls.hidden=true;start.hidden=true;
   stage.classList.remove('assembly-ready','idle-playing','use-still','autoplay-blocked');
@@ -114,8 +140,25 @@ function replayAssembly(){
   content.inert=true;video.currentTime=0;renderScroll();playAssembly();
 }
 video.addEventListener('ended',()=>finishAssembly());
-video.addEventListener('error',()=>offerAssemblyStart(true));
-video.addEventListener('timeupdate',()=>{if(!complete&&!video.paused&&!document.hidden)watchPlayback()});
+video.addEventListener('error',recoverAssembly);
+video.addEventListener('loadedmetadata',()=>{
+  if(resumeAt>0){video.currentTime=resumeAt;lastPlaybackTime=resumeAt;resumeAt=0}
+});
+video.addEventListener('playing',watchPlayback);
+video.addEventListener('timeupdate',()=>{
+  if(!complete&&!video.paused&&!document.hidden&&video.currentTime>lastPlaybackTime){
+    lastPlaybackTime=video.currentTime;watchPlayback();
+  }
+});
+video.addEventListener('progress',()=>{
+  // Slow but advancing downloads are healthy, even before Safari can play a frame.
+  const end=video.buffered.length?video.buffered.end(video.buffered.length-1):0;
+  if(end>lastBufferedEnd){lastBufferedEnd=end;watchPlayback()}
+  // Fetch the idle loop only once it cannot compete with the opening download.
+  if(!document.hidden&&Number.isFinite(video.duration)&&end>=video.duration-.1&&idle.preload==='none'){
+    idle.preload='auto';idle.load();
+  }
+});
 idle.addEventListener('error',useStill);
 outroIdle.addEventListener('playing',()=>{
   const reveal=()=>{if(outroOnScreen&&!document.hidden&&!reducedMotion.matches)outroCard.classList.add('idle-playing')};
@@ -127,7 +170,7 @@ new IntersectionObserver(([entry])=>{
   syncOutroPlayback();
 }).observe(outro);
 replay.addEventListener('click',replayAssembly);
-start.addEventListener('click',()=>playAssembly());
+start.addEventListener('click',()=>{recoveryCount=0;playAssembly(true)});
 document.querySelector('.skip-link').addEventListener('click',()=>finishAssembly(true));
 addEventListener('scroll',schedule,{passive:true});
 addEventListener('resize',()=>{measure();schedule()},{passive:true});
@@ -139,9 +182,14 @@ addEventListener('pageshow',event=>{
 });
 document.addEventListener('visibilitychange',()=>{
   syncOutroPlayback();
-  if(document.hidden){video.pause();idle.pause();clearTimeout(watchdog)}
+  if(document.hidden){stopAssemblyPlayback();idle.pause()}
   else if(!complete&&!stage.classList.contains('autoplay-blocked'))playAssembly();
   else schedule();
+});
+addEventListener('online',()=>{
+  if(!complete&&!document.hidden&&!gestureRequired){
+    recoveryCount=0;playAssembly(true);
+  }
 });
 new ResizeObserver(()=>{measure();schedule()}).observe(content);
 document.fonts.ready.then(()=>{measure();schedule()});

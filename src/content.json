@@ -1,0 +1,280 @@
+{
+  "email": "shivaprakash233@gmail.com",
+  "linkedin": "https://www.linkedin.com/in/shiva-prakash233/",
+  "github": "https://github.com/shiva233",
+  "x": "https://x.com/shiva233233",
+  "projects": [
+    {
+      "id": "aether",
+      "name": "Aether",
+      "category": "Audio / Mixed-signal hardware",
+      "description": "A USB-C powered audio bridge that brings Bluetooth audio from a phone or console into a PC as a USB audio input.",
+      "details": [
+        "Microchip BM83 Bluetooth audio module paired with an STM32 USB interface over I2S.",
+        "Four-layer KiCad PCB with controlled USB 2.0 routing, ESD protection, separated power domains and an antenna keepout.",
+        "Custom 5 V to 3.6 V buck converter, with SWD access, configuration headers and dedicated test points for bring-up."
+      ],
+      "tags": [
+        "KiCad",
+        "STM32",
+        "BM83",
+        "I2S",
+        "USB 2.0"
+      ],
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shiva233/Aether"
+        }
+      ],
+      "images": [
+        {
+          "src": "aether-front.webp",
+          "alt": "Aether's red hexagonal PCB, with the BM83 module, STM32 and USB-C connector",
+          "caption": "The assembled board / front",
+          "fit": "contain"
+        },
+        {
+          "src": "aether-back.webp",
+          "alt": "Aether's back silkscreen with musical and space-themed artwork",
+          "caption": "Back silkscreen / a little personality",
+          "fit": "contain"
+        },
+        {
+          "src": "aether-schematic.webp",
+          "alt": "Aether schematic showing the Bluetooth module, STM32, interfaces and test points",
+          "caption": "Main board schematic",
+          "fit": "contain"
+        },
+        {
+          "src": "aether-power.webp",
+          "alt": "Aether USB-C and power converter schematic",
+          "caption": "USB-C and power architecture",
+          "fit": "contain"
+        }
+      ]
+    },
+    {
+      "id": "naiad",
+      "name": "Naiad",
+      "category": "Low-power / Embedded systems",
+      "description": "Naiad is basically a small USB-C rechargeable keychain type thing that hangs off my HUGEE water bottle and will flash to remind me to drink water when it hasn't detected a sip every X amount of minutes (in my case I chose 15 minutes). I made it because I have a really bad habit of going the entire day without drinking much water, and thought this was a fun way to solve it :)",
+      "details": [
+        "Four-layer Altium PCB using an STM32U0 and BMA400 accelerometer, designed for less than 5 µA quiescent current.",
+        "P-FET and Schottky-diode power path for seamless switching between USB-C and an LIR2032 coin cell.",
+        "MCP73831 charge management and XC6135 voltage supervision for the battery's charge and discharge cycle."
+      ],
+      "tags": [
+        "Altium",
+        "STM32U0",
+        "BMA400",
+        "Battery management"
+      ],
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shiva233/Naiad"
+        }
+      ],
+      "images": [
+        {
+          "src": "naiad-front.webp",
+          "alt": "Naiad's blue water-drop shaped circuit board with its components and USB-C connector",
+          "caption": "A water-drop PCB / front",
+          "fit": "contain"
+        },
+        {
+          "src": "naiad-back.webp",
+          "alt": "Naiad's wave-patterned back with a coin-cell holder",
+          "caption": "Coin-cell holder / back",
+          "fit": "contain"
+        },
+        {
+          "src": "naiad-schematic.webp",
+          "alt": "Naiad schematic with USB-C, battery management, accelerometer and STM32 circuits",
+          "caption": "Power, sensing and control schematic",
+          "fit": "contain"
+        }
+      ]
+    },
+    {
+      "id": "hermes",
+      "name": "Project Hermes",
+      "category": "Product design / Embedded hardware",
+      "description": "Project Hermes is a Raspberry Pi powered game streaming handheld built for PC gamers, streaming your games from your pc via SteamLink to the console wherever you want! (provided you have an internet connection) and since its only streaming the games you can do this without rebuying games or paying console prices for the hardware!",
+      "details": [
+        "Raspberry Pi 4 running SteamLink, with an RP2040-Zero USB HID controller using GP2040-CE firmware.",
+        "5000 mAh UPS and USB-C passthrough charging for up to three hours of gameplay.",
+        "Integrated cooling and a custom enclosure, balancing power, thermals and mechanical fit within a $200 CAD budget."
+      ],
+      "tags": [
+        "RP2040",
+        "Raspberry Pi",
+        "USB HID",
+        "Fusion 360"
+      ],
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shiva233/Project-Hermes"
+        },
+        {
+          "label": "Build journal",
+          "url": "https://github.com/shiva233/Project-Hermes/blob/main/JOURNAL.md"
+        }
+      ],
+      "images": [
+        {
+          "src": "hermes-front.webp",
+          "alt": "Black Project Hermes handheld with a seven-inch screen, joysticks and white buttons",
+          "caption": "The complete handheld",
+          "fit": "photo"
+        },
+        {
+          "src": "hermes-exploded.webp",
+          "alt": "Exploded view of the Hermes enclosure, screen and circuit boards",
+          "caption": "An assembly, layer by layer",
+          "fit": "contain"
+        },
+        {
+          "src": "hermes-drawing.webp",
+          "alt": "Dimensioned views and enclosure model of the Hermes handheld",
+          "caption": "Enclosure design and mechanical drawings",
+          "fit": "contain"
+        }
+      ]
+    },
+    {
+      "id": "hackcharm",
+      "name": "HackCharm",
+      "category": "Interaction / Embedded firmware",
+      "description": "A tiny circular keychain with a pixelated face on an OLED that reacts to taps/shakes to change its expression. It is basically a cute interactive keychain!!",
+      "details": [
+        "Miniature ESP32-S3 PCB with a 128 × 128 OLED and ADXL362 accelerometer; $49.66 CAD bill of materials.",
+        "Gesture-recognition firmware that responds to tap and shake patterns in under 100 ms.",
+        "A 450 mAh Li-Po, deep-sleep firmware and a custom enclosure bring the electronics into a handheld object."
+      ],
+      "tags": [
+        "ESP32-S3",
+        "C/C++",
+        "OLED",
+        "Gesture recognition"
+      ],
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shiva233/HackCharm"
+        },
+        {
+          "label": "Build journal",
+          "url": "https://github.com/shiva233/HackCharm/blob/main/JOURNAL.md"
+        }
+      ],
+      "images": [
+        {
+          "src": "hackcharm-prototype.webp",
+          "alt": "A hand holding the working blue HackCharm OLED companion alongside its circular PCB",
+          "caption": "From bare board to a little companion",
+          "fit": "photo"
+        },
+        {
+          "src": "hackcharm-enclosure.webp",
+          "alt": "HackCharm's circular enclosure model and mechanical drawing",
+          "caption": "Custom enclosure design",
+          "fit": "contain"
+        },
+        {
+          "src": "hackcharm-pcb.webp",
+          "alt": "The circular HackCharm PCB layout with routed traces and components",
+          "caption": "Circular board layout",
+          "fit": "contain"
+        }
+      ]
+    },
+    {
+      "id": "nfc-card",
+      "name": "NFC business card",
+      "category": "RF energy harvesting / Teaching",
+      "description": "A custom PCB with a copper antenna that works without a battery by harvesting power from your phone’s NFC field, lights an LED and shares contact information when tapped. I also taught this as a workshop to 100+ high school students, who each got their own personalized PCB cards for free",
+      "details": [
+        "A copper antenna, NFC circuit, resistor, capacitor and LED powered entirely by the smartphone's RF field.",
+        "Turned the design into a hands-on PCB workshop for more than 100 high school students."
+      ],
+      "tags": [
+        "Passive NFC",
+        "PCB design",
+        "Energy harvesting"
+      ],
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/shiva233/PCB-NFC-Card"
+        },
+        {
+          "label": "Workshop",
+          "url": "https://www.linkedin.com/feed/update/urn:li:activity:7259572787118288896/"
+        }
+      ],
+      "images": [
+        {
+          "src": "nfc-card.webp",
+          "alt": "Shiva's physical NFC business card lighting up above a smartphone",
+          "caption": "A tap, a light, a connection",
+          "fit": "photo"
+        },
+        {
+          "src": "nfc-workshop.webp",
+          "alt": "Students learning PCB design in Shiva's classroom workshop",
+          "caption": "Sharing PCB design with 100+ students",
+          "fit": "photo"
+        }
+      ]
+    },
+    {
+      "id": "dod",
+      "name": "Duck off doomscrolling",
+      "category": "Computer vision / Mechatronics",
+      "description": "Duck off Doomscrolling (or D.O.D for short) is a fun way to quit destructive/disruptive social media! Basically it is a duck that will sit on your desk while you work, track your face using openCV and a servo, and finally.. squirt water on you if you open doom scrolling apps such as Instagram Reels! >:D (this was a hackathon project built in 4 days).",
+      "details": [
+        "OpenCV face detection with sub-100 ms servo response and closed-loop targeting within one metre.",
+        "Two MG996R servos and a mechanically actuated water-gun trigger connect the vision system to the real world."
+      ],
+      "tags": [
+        "Python",
+        "OpenCV",
+        "Arduino",
+        "Servo control"
+      ],
+      "links": [
+        {
+          "label": "Repository",
+          "url": "https://github.com/101zh/DOD"
+        },
+        {
+          "label": "Watch demo",
+          "url": "https://www.youtube.com/watch?v=_19QPQVmDLk"
+        }
+      ],
+      "images": [
+        {
+          "src": "dod-front.webp",
+          "alt": "The black DOD duck mounted on its colourful rotating water-turret base",
+          "caption": "The anti-doomscrolling duck",
+          "fit": "photo"
+        },
+        {
+          "src": "dod-electronics.webp",
+          "alt": "DOD's wiring, controller and servo electronics inside the base",
+          "caption": "Inside the base / electronics",
+          "fit": "photo"
+        },
+        {
+          "src": "dod-mechanism.webp",
+          "alt": "DOD's opened body revealing its water gun and mechanical trigger",
+          "caption": "Inside the duck / actuation",
+          "fit": "photo"
+        }
+      ]
+    }
+  ]
+}

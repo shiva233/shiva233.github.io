@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const flush=async()=>{for(let i=0;i<5;i++)await Promise.resolve()};
-function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=null}={}){
+function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=null,readyState=4}={}){
   const timers=new Map(),windowEvents=new Map(),documentEvents=new Map(),elements=new Map();
   let timerId=0;
   function element(){
@@ -16,8 +16,8 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
       style:{setProperty(){}},querySelectorAll:()=>[],
       addEventListener:(name,fn)=>events.set(name,[...(events.get(name)||[]),fn]),
       fire:(name,event={})=>(events.get(name)||[]).forEach(fn=>fn(event)),
-      paused:true,currentTime:0,playCalls:0,loadCalls:0,error:null,duration:16,preload:'none',
-      buffered:{length:0,end(){return 0}},
+      paused:true,currentTime:0,playCalls:0,loadCalls:0,error:null,duration:16,preload:'none',readyState:4,
+      buffered:{length:0,start(){return 0},end(){return 0}},
       play(){this.playCalls++;if(this.playError)return Promise.reject(this.playError);this.paused=false;return this.playPromise||Promise.resolve()},
       pause(){this.paused=true},load(){this.loadCalls++;this.error=null;this.currentTime=0}
     };
@@ -26,6 +26,7 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
   const video=get('#pcb-video'),idle=get('#pcb-idle'),root=element();
   video.playError=playError;
   video.playPromise=playPromise;
+  video.readyState=readyState;
   get('#gallery-data').textContent='[]';
   get('.intro').offsetHeight=2400;get('.outro').offsetTop=8000;
   const doc={hidden,documentElement:root,querySelector:get,querySelectorAll:()=>[],fonts:{ready:Promise.resolve()},
@@ -44,6 +45,7 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
   return {get,video,idle,root,doc,history,location,context,timers,
     tick(){const [id,fn]=timers.entries().next().value||[];assert.ok(fn,'Expected a pending timer');timers.delete(id);fn()},
     visibility(value){doc.hidden=value;documentEvents.get('visibilitychange')()},
+    fireDocument(name,event={}){documentEvents.get(name)?.(event)},
     fireWindow(name,event={}){for(const fn of windowEvents.get(name)||[])fn(event)}
   };
 }
@@ -70,14 +72,79 @@ test('a background load waits for visibility without a timeout',async()=>{
   f.visibility(true);assert.equal(f.video.paused,true);assert.equal(f.timers.size,0);
   assertAssemblyOnly(f);
 });
-for(const name of ['NotAllowedError']){
-  test(`${name} offers playback instead of skipping to idle`,async()=>{
-    const f=fixture({playError:{name}});await flush();assertAssemblyOnly(f);
+test('the intro waits for enough video data and starts without a click',async()=>{
+  const f=fixture({readyState:0});await flush();assertAssemblyOnly(f);
+  assert.equal(f.video.playCalls,0);assert.equal(f.get('#start-animation').hidden,true);
+  assert.equal(f.video.autoplay,true,'Native muted autoplay can load while script playback waits for readiness');
+  f.video.readyState=2;f.video.fire('loadeddata');await flush();assert.equal(f.video.playCalls,0);
+  f.video.readyState=3;f.video.fire('canplay');await flush();assert.equal(f.video.playCalls,0);
+  f.video.readyState=4;f.video.fire('canplaythrough');await flush();
+  assert.equal(f.video.playCalls,1);assert.equal(f.video.paused,false);
+  assert.equal(f.video.autoplay,true);assert.equal(f.video.muted,true);assert.equal(f.video.playsInline,true);
+});
+test('a fully buffered download starts even without a canplaythrough event',async()=>{
+  const f=fixture({readyState:3});await flush();assert.equal(f.video.playCalls,0);
+  f.video.buffered={length:1,start:()=>0,end:()=>16};f.video.fire('progress');await flush();
+  assert.equal(f.video.playCalls,1);assert.equal(f.get('#start-animation').hidden,true);
+});
+test('background readiness waits until the tab becomes visible',async()=>{
+  const f=fixture({hidden:true,readyState:0});await flush();
+  f.video.readyState=4;f.video.fire('canplaythrough');await flush();
+  assert.equal(f.video.playCalls,0);assert.equal(f.timers.size,0);assert.equal(f.video.autoplay,false);
+  f.visibility(false);await flush();assert.equal(f.video.playCalls,1);assertAssemblyOnly(f);
+});
+test('a temporary autoplay refusal retries without a button or reloading data',async()=>{
+  const f=fixture({playError:{name:'NotAllowedError'}});await flush();assertAssemblyOnly(f);
+  assert.equal(f.get('#start-animation').hidden,true);
+  f.video.playError=null;f.tick();await flush();
+  assert.equal(f.video.playCalls,2);assert.equal(f.video.loadCalls,0);
+  assert.equal(f.video.paused,false);assert.equal(f.get('#start-animation').hidden,true);
+});
+test('readiness events do not duplicate a pending play request',async()=>{
+  const f=fixture({playPromise:new Promise(()=>{})});await flush();
+  f.video.fire('canplay');f.video.fire('canplaythrough');f.fireWindow('focus');await flush();
+  assert.equal(f.video.playCalls,1);assert.equal(f.get('#start-animation').hidden,true);
+});
+test('a background tab cancels an autoplay retry and resumes automatically on return',async()=>{
+  const f=fixture({playError:{name:'NotAllowedError'}});await flush();
+  assert.equal(f.timers.size,1);f.visibility(true);assert.equal(f.timers.size,0);
+  assert.equal(f.video.autoplay,false);f.video.playError=null;f.visibility(false);await flush();
+  assert.equal(f.video.playCalls,2);assert.equal(f.video.paused,false);
+  assert.equal(f.get('#start-animation').hidden,true);assert.equal(f.video.loadCalls,0);
+});
+test('persistent autoplay restrictions have bounded retries and a working fallback',async()=>{
+  const f=fixture({playError:{name:'NotAllowedError'}});await flush();
+  for(let i=0;i<3;i++){assert.equal(f.get('#start-animation').hidden,true);f.tick();await flush()}
+  assert.equal(f.video.playCalls,4);assert.equal(f.video.loadCalls,0);
+  assert.equal(f.get('#start-animation').hidden,false);assert.equal(f.timers.size,0);
+  f.video.playError=null;f.get('#start-animation').fire('click');await flush();
+  assert.equal(f.video.paused,false);assert.equal(f.video.loadCalls,0);assertAssemblyOnly(f);
+});
+test('visibility and focus can recover from a previous autoplay restriction',async()=>{
+  for(const event of ['visibility','focus']){
+    const f=fixture({playError:{name:'NotAllowedError'}});await flush();
+    for(let i=0;i<3;i++){f.tick();await flush()}
     assert.equal(f.get('#start-animation').hidden,false);
-    f.video.playError=null;f.get('#start-animation').fire('click');await flush();
-    assert.equal(f.video.paused,false);assertAssemblyOnly(f);
-  });
-}
+    f.video.playError=null;
+    if(event==='visibility'){f.visibility(true);f.visibility(false)}else f.fireWindow('focus');
+    await flush();assert.equal(f.video.paused,false);assert.equal(f.get('#start-animation').hidden,true);
+    assert.equal(f.video.loadCalls,0);
+  }
+});
+test('an ordinary trusted tap can unlock a browser that requires activation',async()=>{
+  const f=fixture({playError:{name:'NotAllowedError'}});await flush();
+  f.video.playError=null;
+  f.fireDocument('touchend',{isTrusted:false});await flush();assert.equal(f.video.playCalls,1);
+  f.fireDocument('touchend',{isTrusted:true});await flush();
+  assert.equal(f.video.playCalls,2);assert.equal(f.video.paused,false);
+  assert.equal(f.get('#start-animation').hidden,true);assert.equal(f.video.loadCalls,0);
+});
+test('native playback after a refusal cancels the scheduled retry',async()=>{
+  const f=fixture({playError:{name:'NotAllowedError'}});await flush();
+  const retry=[...f.timers.keys()][0];f.video.paused=false;f.video.fire('playing');
+  assert.equal(f.timers.has(retry),false);assert.equal(f.get('#start-animation').hidden,true);
+  assert.equal(f.video.playCalls,1);assertAssemblyOnly(f);
+});
 test('a stalled load reloads twice before offering manual retry',async()=>{
   const f=fixture();await flush();
   for(let i=0;i<2;i++){
@@ -102,7 +169,7 @@ test('slow download progress keeps waiting instead of showing retry',async()=>{
   const f=fixture({playPromise:new Promise(()=>{})});await flush();
   for(let end=1;end<=10;end++){
     const timer=[...f.timers.keys()][0];
-    f.video.buffered={length:1,end:()=>end};f.video.fire('progress');
+    f.video.buffered={length:1,start:()=>0,end:()=>end};f.video.fire('progress');
     assert.equal(f.timers.has(timer),false,'Advancing downloads renew the stall timeout');
     assert.equal(f.timers.size,1);assert.equal(f.get('#start-animation').hidden,true);
     assert.equal(f.video.loadCalls,0);assertAssemblyOnly(f);
@@ -112,8 +179,8 @@ test('slow download progress keeps waiting instead of showing retry',async()=>{
 });
 test('idle download waits until the assembly is fully buffered',async()=>{
   const f=fixture();await flush();assert.equal(f.idle.loadCalls,0);
-  f.video.buffered={length:1,end:()=>8};f.video.fire('progress');assert.equal(f.idle.loadCalls,0);
-  f.video.buffered={length:1,end:()=>16};f.video.fire('progress');assert.equal(f.idle.loadCalls,1);
+  f.video.buffered={length:1,start:()=>0,end:()=>8};f.video.fire('progress');assert.equal(f.idle.loadCalls,0);
+  f.video.buffered={length:1,start:()=>0,end:()=>16};f.video.fire('progress');assert.equal(f.idle.loadCalls,1);
   f.video.fire('progress');assert.equal(f.idle.loadCalls,1);assertAssemblyOnly(f);
 });
 test('an old play rejection after a quick tab switch cannot stop the new attempt',async()=>{
@@ -139,7 +206,8 @@ test('returning online retries a failed download but preserves gesture requireme
   const f=fixture();await flush();f.video.error={code:2};f.video.fire('error');
   f.fireWindow('online');await flush();assert.equal(f.video.loadCalls,1);assert.equal(f.video.paused,false);
   const blocked=fixture({playError:{name:'NotAllowedError'}});await flush();
-  blocked.fireWindow('online');await flush();assert.equal(blocked.video.playCalls,1);
+  for(let i=0;i<3;i++){blocked.tick();await flush()}
+  blocked.fireWindow('online');await flush();assert.equal(blocked.video.playCalls,4);
   assert.equal(blocked.get('#start-animation').hidden,false);
 });
 test('completion enters idle; a restored page restarts assembly',async()=>{

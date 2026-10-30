@@ -51,3 +51,9 @@ with the current résumé and portfolio.
 The PCB animation was rendered with [Silkreel](https://github.com/hridaya423/silkreel).
 Its license is included in `assets/Silkreel-LICENSE.txt`. IBM Plex Mono is bundled
 locally with its license in `assets/IBM-Plex-Mono-LICENSE.txt`.
+
+The intro enables native muted autoplay only while the tab is visible, and script
+playback waits for enough buffered data. Temporary autoplay refusals retry without
+reloading the video; visibility and focus changes trigger a fresh attempt. Genuine
+browser restrictions retain a manual fallback, and an ordinary trusted tap or key
+can also unlock playback. Startup regression coverage includes these transitions.

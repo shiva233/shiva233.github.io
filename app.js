@@ -18,7 +18,8 @@ const controls = document.querySelector('.hero-controls');
 const clamp = (x, lo=0, hi=1) => Math.max(lo, Math.min(hi, x));
 const ease = x => {x=clamp(x); return x*x*(3-2*x)};
 let complete=false, scheduled=false, introTop=0, introTravel=1, outroTop=0, outroTravel=1;
-let watchdog, recoveryTimer, playbackGeneration=0, playAttempt=0, recoveryCount=0;
+let watchdog, recoveryTimer, autoplayTimer, playbackGeneration=0, playAttempt=0, recoveryCount=0;
+let playPending=false, autoplayRetries=0;
 let resumeAt=0, lastPlaybackTime=0, lastBufferedEnd=0, gestureRequired=false;
 let outroOnScreen=false;
 function syncOutroPlayback(){
@@ -90,7 +91,9 @@ function offerAssemblyStart(retry=false){
 function stopAssemblyPlayback(){
   // pause()/load() reject pending play promises, sometimes after the tab returns.
   // Invalidate those promises before pausing so they cannot replace a newer attempt.
-  playAttempt++;clearTimeout(watchdog);clearTimeout(recoveryTimer);recoveryTimer=undefined;
+  playAttempt++;playPending=false;video.autoplay=false;
+  clearTimeout(watchdog);clearTimeout(recoveryTimer);recoveryTimer=undefined;
+  clearTimeout(autoplayTimer);autoplayTimer=undefined;
   video.pause();
 }
 function watchPlayback(){
@@ -104,14 +107,35 @@ function recoverAssembly(){
   recoveryCount++;
   recoveryTimer=setTimeout(()=>{recoveryTimer=undefined;playAssembly(true)},500*recoveryCount);
 }
-async function playAssembly(reload=false){
+function retryAutoplay(){
+  clearTimeout(watchdog);
+  // A new tab can reject play() before its visibility/layout has settled.
+  // Retry the already buffered video before asking for a browser-required gesture.
+  const delays=[250,750,1500];
+  if(autoplayRetries>=delays.length){offerAssemblyStart();return}
+  autoplayTimer=setTimeout(()=>{autoplayTimer=undefined;playAssembly()},delays[autoplayRetries++]);
+}
+function readyToPlay(){
+  if(video.readyState>=4)return true;
+  return Number.isFinite(video.duration)&&video.buffered.length===1&&
+    video.buffered.start(0)<=.1&&video.buffered.end(video.buffered.length-1)>=video.duration-.1;
+}
+function playWhenReady(){
+  if(!complete&&!document.hidden&&!gestureRequired&&autoplayTimer===undefined&&recoveryTimer===undefined&&readyToPlay())playAssembly();
+}
+async function playAssembly(reload=false,fromGesture=false){
   if(reducedMotion.matches){finishAssembly(true);return}
   // Never spend the opening (or its loading timeout) in a background tab.
   if(document.hidden||complete)return;
+  if(playPending&&!reload)return;
+  if(!video.paused&&!reload)return;
   const attempt=++playAttempt;
   gestureRequired=false;
   clearTimeout(recoveryTimer);recoveryTimer=undefined;
+  clearTimeout(autoplayTimer);autoplayTimer=undefined;
   video.muted=true;video.defaultMuted=true;
+  // Enable native muted autoplay only in a visible tab, including while buffering.
+  video.playsInline=true;video.autoplay=true;
   if(reload||video.error){
     resumeAt=Math.max(resumeAt,video.currentTime||0);
     lastBufferedEnd=0;video.load();
@@ -119,19 +143,26 @@ async function playAssembly(reload=false){
   video.defaultPlaybackRate=1.5;video.playbackRate=1.5;
   start.hidden=true;stage.classList.remove('autoplay-blocked');
   watchPlayback();
+  // Loading a frame is not the same as being ready to play through the intro.
+  // A real gesture may call play immediately so browsers keep that activation.
+  if(!fromGesture&&!readyToPlay())return;
+  playPending=true;
   try{
     await video.play();
     if(attempt!==playAttempt)return;
+    playPending=false;autoplayRetries=0;
     if(document.hidden||complete){video.pause();clearTimeout(watchdog)}
   }
   catch(error){
     if(complete||document.hidden||attempt!==playAttempt)return;
-    if(error.name==='NotAllowedError')offerAssemblyStart();
+    playPending=false;
+    if(error.name==='NotAllowedError')retryAutoplay();
     else recoverAssembly();
   }
 }
 function replayAssembly(){
-  stopAssemblyPlayback();recoveryCount=0;resumeAt=0;lastPlaybackTime=0;lastBufferedEnd=0;
+  stopAssemblyPlayback();recoveryCount=0;autoplayRetries=0;gestureRequired=false;
+  resumeAt=0;lastPlaybackTime=0;lastBufferedEnd=0;
   playbackGeneration++;complete=false;idle.pause();idle.currentTime=0;
   controls.hidden=true;start.hidden=true;
   stage.classList.remove('assembly-ready','idle-playing','use-still','autoplay-blocked');
@@ -144,7 +175,13 @@ video.addEventListener('error',recoverAssembly);
 video.addEventListener('loadedmetadata',()=>{
   if(resumeAt>0){video.currentTime=resumeAt;lastPlaybackTime=resumeAt;resumeAt=0}
 });
-video.addEventListener('playing',watchPlayback);
+for(const event of ['loadeddata','canplay','canplaythrough'])video.addEventListener(event,playWhenReady);
+video.addEventListener('playing',()=>{
+  if(complete||document.hidden){stopAssemblyPlayback();return}
+  autoplayRetries=0;gestureRequired=false;
+  clearTimeout(autoplayTimer);autoplayTimer=undefined;
+  start.hidden=true;stage.classList.remove('autoplay-blocked');watchPlayback();
+});
 video.addEventListener('timeupdate',()=>{
   if(!complete&&!video.paused&&!document.hidden&&video.currentTime>lastPlaybackTime){
     lastPlaybackTime=video.currentTime;watchPlayback();
@@ -158,6 +195,7 @@ video.addEventListener('progress',()=>{
   if(!document.hidden&&Number.isFinite(video.duration)&&end>=video.duration-.1&&idle.preload==='none'){
     idle.preload='auto';idle.load();
   }
+  playWhenReady();
 });
 idle.addEventListener('error',useStill);
 outroIdle.addEventListener('playing',()=>{
@@ -170,22 +208,37 @@ new IntersectionObserver(([entry])=>{
   syncOutroPlayback();
 }).observe(outro);
 replay.addEventListener('click',replayAssembly);
-start.addEventListener('click',()=>{recoveryCount=0;playAssembly(true)});
+start.addEventListener('click',()=>{recoveryCount=0;autoplayRetries=0;playAssembly(!gestureRequired,true)});
+function resumeVisibleAssembly(){
+  if(complete||document.hidden||playPending||!video.paused)return;
+  autoplayRetries=0;playAssembly();
+}
+// If the browser requires activation, an ordinary tap/key can unlock playback;
+// visitors do not have to find the fallback button specifically.
+function resumeWithGesture(event){
+  if(event.isTrusted&&event.target!==start&&!complete&&!document.hidden&&(gestureRequired||autoplayTimer!==undefined)){
+    autoplayRetries=0;playAssembly(false,true);
+  }
+}
+document.addEventListener('touchend',resumeWithGesture,{passive:true});
+document.addEventListener('click',resumeWithGesture);
+document.addEventListener('keydown',resumeWithGesture);
 document.querySelector('.skip-link').addEventListener('click',()=>finishAssembly(true));
 addEventListener('scroll',schedule,{passive:true});
 addEventListener('resize',()=>{measure();schedule()},{passive:true});
-addEventListener('load',()=>{if(!complete)scrollTo({top:0,behavior:'instant'});measure();schedule()});
+addEventListener('load',()=>{if(!complete)scrollTo({top:0,behavior:'instant'});playWhenReady();measure();schedule()});
 addEventListener('pageshow',event=>{
   if(event.persisted&&!reducedMotion.matches)startNewVisit();
-  else if(!complete)scrollTo({top:0,behavior:'instant'});
+  else if(!complete){scrollTo({top:0,behavior:'instant'});resumeVisibleAssembly()}
   measure();schedule();
 });
 document.addEventListener('visibilitychange',()=>{
   syncOutroPlayback();
   if(document.hidden){stopAssemblyPlayback();idle.pause()}
-  else if(!complete&&!stage.classList.contains('autoplay-blocked'))playAssembly();
+  else if(!complete)resumeVisibleAssembly();
   else schedule();
 });
+addEventListener('focus',resumeVisibleAssembly);
 addEventListener('online',()=>{
   if(!complete&&!document.hidden&&!gestureRequired){
     recoveryCount=0;playAssembly(true);

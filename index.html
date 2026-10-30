@@ -9,7 +9,7 @@
   <meta property="og:type" content="website"><meta property="og:image" content="assets/pcb-final.webp?v=3">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="assets/ibm-plex-mono-400.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="styles.css"><script src="app.js?v=3" defer></script>
+  <link rel="stylesheet" href="styles.css?v=4"><script src="image-animation.js?v=1" defer></script><script src="app.js?v=4" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#about">Skip animation and read résumé</a>
@@ -21,6 +21,8 @@
         <video id="pcb-video" src="assets/pcb-reveal.mp4?v=3" muted playsinline preload="auto" poster="assets/pcb-start.webp" disablepictureinpicture aria-label="Shiva’s PCB business card assembling from copper traces to silkscreen and components"></video>
         <video id="pcb-idle" src="assets/pcb-idle.mp4?v=3" muted playsinline loop preload="none" disablepictureinpicture aria-hidden="true"></video>
         <img class="card-still" id="intro-still" src="assets/pcb-final.webp?v=3" alt="Shiva Prakash’s finished PCB business card" width="1920" height="1080" fetchpriority="low">
+        <img class="pcb-image-animation" id="pcb-image-animation" alt="" width="960" height="540" hidden aria-hidden="true">
+        <img class="pcb-image-animation" id="pcb-idle-image" alt="" width="960" height="540" hidden aria-hidden="true">
       </div>
       <div class="hero-controls" hidden>
         <a class="scroll-cue" href="#about">Scroll to explore<span class="scroll-arrow" aria-hidden="true">↓</span></a>
@@ -139,7 +141,7 @@
   <section class="outro" id="outro" aria-label="Return to the PCB business card">
     <div class="outro-stage">
       <div class="outro-copy"><span class="eyebrow">END OF THE TRACE</span><h2>Thanks for reading.</h2><p>Have something in mind? Let’s build it.</p></div>
-      <div class="outro-card"><video id="outro-idle" src="assets/pcb-idle.mp4?v=3" muted playsinline loop preload="none" disablepictureinpicture aria-hidden="true"></video><img src="assets/pcb-final.webp?v=3" alt="Shiva's completed PCB business card hovering against black" width="1920" height="1080" loading="lazy"></div>
+      <div class="outro-card"><video id="outro-idle" src="assets/pcb-idle.mp4?v=3" muted playsinline loop preload="none" disablepictureinpicture aria-hidden="true"></video><img src="assets/pcb-final.webp?v=3" alt="Shiva's completed PCB business card hovering against black" width="1920" height="1080" loading="lazy"><img class="pcb-image-animation" id="outro-idle-image" alt="" width="960" height="540" hidden aria-hidden="true"></div>
       <div class="outro-bloom" aria-hidden="true"></div>
       <footer class="contact"><span class="eyebrow">MAKE A CONNECTION</span><a class="email-link" href="mailto:shivaprakash233@gmail.com">shivaprakash233@gmail.com <span aria-hidden="true">↗</span></a><div class="contact-links"><a href="https://www.linkedin.com/in/shiva-prakash233/" target="_blank" rel="noopener noreferrer">LinkedIn ↗</a><a href="https://x.com/shiva233233" target="_blank" rel="noopener noreferrer">X <span aria-hidden="true">↗</span></a><a href="https://github.com/shiva233" target="_blank" rel="noopener noreferrer">GitHub ↗</a><a class="resume-button" href="assets/shiva-prakash-resume-portfolio.pdf" target="_blank" rel="noopener">View résumé ↗</a></div><div class="footer-meta"><span>© <span id="year">2026</span> SHIVA PRAKASH</span><a href="https://github.com/hridaya423/silkreel" target="_blank" rel="noopener noreferrer">Opening animation built with <span>Silkreel ↗</span></a><a href="#top">BACK TO TOP ↑</a></div></footer>
     </div>

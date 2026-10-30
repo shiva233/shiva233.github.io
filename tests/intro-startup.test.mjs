@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 
-const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
-const flush=async()=>{for(let i=0;i<5;i++)await Promise.resolve()};
-function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=null,readyState=4}={}){
+const source=readFileSync(new URL('../image-animation.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../app.js',import.meta.url),'utf8');
+const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve()};
+function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=null,readyState=4,imageFetch=()=>Promise.resolve({ok:true,blob:()=>Promise.resolve({})})}={}){
   const timers=new Map(),windowEvents=new Map(),documentEvents=new Map(),elements=new Map();
   let timerId=0;
   function element(){
@@ -15,7 +15,8 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
       classList:{add:(...names)=>names.forEach(n=>classes.add(n)),remove:(...names)=>names.forEach(n=>classes.delete(n)),contains:n=>classes.has(n),toggle:(n,on)=>on?classes.add(n):classes.delete(n)},
       style:{setProperty(){}},querySelectorAll:()=>[],
       addEventListener:(name,fn)=>events.set(name,[...(events.get(name)||[]),fn]),
-      fire:(name,event={})=>(events.get(name)||[]).forEach(fn=>fn(event)),
+      fire(name,event={}){(events.get(name)||[]).forEach(fn=>fn(event));this['on'+name]?.(event)},
+      removeAttribute(name){delete this[name]},
       paused:true,currentTime:0,playCalls:0,loadCalls:0,error:null,duration:16,preload:'none',readyState:4,
       buffered:{length:0,start(){return 0},end(){return 0}},
       play(){this.playCalls++;if(this.playError)return Promise.reject(this.playError);this.paused=false;return this.playPromise||Promise.resolve()},
@@ -34,6 +35,7 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
   const location={hash,pathname:'/',search:''};
   const history={state:null,scrollRestoration:'auto',replaceState(state,title,url){location.hash='';this.url=url},pushState(){}};
   const context=vm.createContext({
+    fetch:imageFetch,AbortController,URL:{createObjectURL:()=>`blob:qa-${++timerId}`,revokeObjectURL(){}},
     document:doc,location,history,innerHeight:1000,scrollY:5000,
     matchMedia:()=>({matches:reduced,addEventListener(){}}),
     scrollTo:({top})=>{context.scrollY=top},requestAnimationFrame(){},
@@ -72,20 +74,35 @@ test('a background load waits for visibility without a timeout',async()=>{
   f.visibility(true);assert.equal(f.video.paused,true);assert.equal(f.timers.size,0);
   assertAssemblyOnly(f);
 });
-test('the intro waits for enough video data and starts without a click',async()=>{
-  const f=fixture({readyState:0});await flush();assertAssemblyOnly(f);
-  assert.equal(f.video.playCalls,0);assert.equal(f.get('#start-animation').hidden,true);
-  assert.equal(f.video.autoplay,true,'Native muted autoplay can load while script playback waits for readiness');
-  f.video.readyState=2;f.video.fire('loadeddata');await flush();assert.equal(f.video.playCalls,0);
-  f.video.readyState=3;f.video.fire('canplay');await flush();assert.equal(f.video.playCalls,0);
-  f.video.readyState=4;f.video.fire('canplaythrough');await flush();
-  assert.equal(f.video.playCalls,1);assert.equal(f.video.paused,false);
+test('mobile preload needs play before any media data is available',async()=>{
+  let playbackStarted;
+  const f=fixture({readyState:0,playPromise:new Promise(resolve=>playbackStarted=resolve)});
+  await flush();assertAssemblyOnly(f);
+  assert.equal(f.video.playCalls,1,'play must initiate loading without waiting for a readiness event');
+  assert.equal(f.get('#start-animation').hidden,true);
   assert.equal(f.video.autoplay,true);assert.equal(f.video.muted,true);assert.equal(f.video.playsInline,true);
+  // Safari can remain at metadata until the outstanding play request starts loading.
+  f.video.readyState=1;f.video.fire('loadedmetadata');await flush();
+  assert.equal(f.video.playCalls,1);assert.equal(f.video.loadCalls,0);
+  f.video.readyState=3;f.video.fire('canplay');playbackStarted();await flush();
+  assert.equal(f.video.paused,false);assert.equal(f.video.playCalls,1);assertAssemblyOnly(f);
+  // No canplaythrough or fully buffered range is needed to finish the intro.
+  f.video.fire('ended');await flush();assert.equal(f.idle.playCalls,1);
+  assert.equal(f.get('.hero-controls').hidden,false);
 });
-test('a fully buffered download starts even without a canplaythrough event',async()=>{
-  const f=fixture({readyState:3});await flush();assert.equal(f.video.playCalls,0);
-  f.video.buffered={length:1,start:()=>0,end:()=>16};f.video.fire('progress');await flush();
+test('partially buffered video starts without canplaythrough',async()=>{
+  const f=fixture({readyState:3});await flush();
+  f.video.buffered={length:1,start:()=>0,end:()=>2};f.video.fire('progress');await flush();
   assert.equal(f.video.playCalls,1);assert.equal(f.get('#start-animation').hidden,true);
+});
+test('a trusted tap can release a pending mobile play request before readiness',async()=>{
+  let rejectOld;
+  const f=fixture({readyState:0,playPromise:new Promise((resolve,reject)=>rejectOld=reject)});
+  await flush();f.video.playPromise=null;
+  f.fireDocument('touchend',{isTrusted:true});await flush();
+  assert.equal(f.video.playCalls,2);assert.equal(f.video.loadCalls,0);
+  rejectOld({name:'AbortError'});await flush();
+  assert.equal(f.video.paused,false);assert.equal(f.get('#start-animation').hidden,true);
 });
 test('background readiness waits until the tab becomes visible',async()=>{
   const f=fixture({hidden:true,readyState:0});await flush();
@@ -112,24 +129,64 @@ test('a background tab cancels an autoplay retry and resumes automatically on re
   assert.equal(f.video.playCalls,2);assert.equal(f.video.paused,false);
   assert.equal(f.get('#start-animation').hidden,true);assert.equal(f.video.loadCalls,0);
 });
-test('persistent autoplay restrictions have bounded retries and a working fallback',async()=>{
+test('persistent autoplay restrictions start the image animation without a gesture',async()=>{
   const f=fixture({playError:{name:'NotAllowedError'}});await flush();
   for(let i=0;i<3;i++){assert.equal(f.get('#start-animation').hidden,true);f.tick();await flush()}
   assert.equal(f.video.playCalls,4);assert.equal(f.video.loadCalls,0);
-  assert.equal(f.get('#start-animation').hidden,false);assert.equal(f.timers.size,0);
-  f.video.playError=null;f.get('#start-animation').fire('click');await flush();
-  assert.equal(f.video.paused,false);assert.equal(f.video.loadCalls,0);assertAssemblyOnly(f);
+  assert.equal(f.get('#start-animation').hidden,true);assert.equal(f.timers.size,0);
+  assert.match(f.get('#pcb-image-animation').src,/^blob:/);
+  assert.equal(f.video.paused,true);assert.equal(f.video.autoplay,false);assertAssemblyOnly(f);
+  f.get('#pcb-image-animation').fire('load');assert.equal(f.get('#pcb-image-animation').hidden,false);
+  assertAssemblyOnly(f);f.tick();await flush();
+  assert.equal(f.get('.hero-controls').hidden,false);assert.equal(f.idle.playCalls,0);
+  assert.match(f.get('#pcb-idle-image').src,/^blob:/);
 });
-test('visibility and focus can recover from a previous autoplay restriction',async()=>{
-  for(const event of ['visibility','focus']){
-    const f=fixture({playError:{name:'NotAllowedError'}});await flush();
-    for(let i=0;i<3;i++){f.tick();await flush()}
-    assert.equal(f.get('#start-animation').hidden,false);
-    f.video.playError=null;
-    if(event==='visibility'){f.visibility(true);f.visibility(false)}else f.fireWindow('focus');
-    await flush();assert.equal(f.video.paused,false);assert.equal(f.get('#start-animation').hidden,true);
-    assert.equal(f.video.loadCalls,0);
-  }
+test('image animation restarts on returning to the tab without finishing in the background',async()=>{
+  const f=fixture({playError:{name:'NotAllowedError'}});await flush();
+  for(let i=0;i<3;i++){f.tick();await flush()}
+  const image=f.get('#pcb-image-animation'),prior=image.src;
+  image.fire('load');f.visibility(true);assert.equal(f.timers.size,0);assert.equal(image.hidden,true);
+  f.visibility(false);await flush();assert.notEqual(image.src,prior);assertAssemblyOnly(f);
+  assert.equal(f.get('#start-animation').hidden,true);assert.equal(f.video.playCalls,4);
+  f.fireWindow('focus');await flush();assert.equal(f.video.playCalls,4);
+});
+test('a slow fallback download cannot finish assembly before its first frame loads',async()=>{
+  let downloaded;
+  const f=fixture({playError:{name:'NotAllowedError'},imageFetch:()=>new Promise(resolve=>downloaded=resolve)});
+  await flush();for(let i=0;i<3;i++){f.tick();await flush()}
+  assertAssemblyOnly(f);assert.equal(f.get('#pcb-image-animation').src,undefined);
+  downloaded({ok:true,blob:()=>Promise.resolve({})});await flush();
+  assertAssemblyOnly(f);assert.equal(f.timers.size,0,'The animation clock starts on image load, not download start');
+  f.get('#pcb-image-animation').fire('load');assert.equal(f.timers.size,1);
+  f.tick();await flush();assert.equal(f.get('.hero-controls').hidden,false);
+});
+test('a fallback download completing in the background waits for a visible tab',async()=>{
+  let downloaded;
+  const f=fixture({playError:{name:'NotAllowedError'},imageFetch:()=>new Promise(resolve=>downloaded=resolve)});
+  await flush();for(let i=0;i<3;i++){f.tick();await flush()}
+  f.visibility(true);downloaded({ok:true,blob:()=>Promise.resolve({})});await flush();
+  assert.equal(f.get('#pcb-image-animation').src,undefined);assertAssemblyOnly(f);
+  f.visibility(false);await flush();assert.match(f.get('#pcb-image-animation').src,/^blob:/);
+  assertAssemblyOnly(f);
+});
+test('replaying the image fallback restarts from the beginning using cached bytes',async()=>{
+  let downloads=0;
+  const f=fixture({playError:{name:'NotAllowedError'},imageFetch:()=>{downloads++;return Promise.resolve({ok:true,blob:()=>Promise.resolve({})})}});
+  await flush();for(let i=0;i<3;i++){f.tick();await flush()}
+  const first=f.get('#pcb-image-animation').src;f.get('#pcb-image-animation').fire('load');
+  f.tick();await flush();const priorDownloads=downloads;
+  f.get('#play-animation').fire('click');await flush();
+  assert.notEqual(f.get('#pcb-image-animation').src,first);assert.equal(downloads,priorDownloads);
+  assert.equal(f.get('#pcb-idle-image').hidden,true);assert.equal(f.get('.hero-controls').hidden,true);
+  assert.equal(f.root.classList.contains('intro-locked'),true);
+});
+test('a failed fallback download offers a working network retry',async()=>{
+  let fails=true;
+  const f=fixture({playError:{name:'NotAllowedError'},imageFetch:()=>fails?Promise.reject(new Error('offline')):Promise.resolve({ok:true,blob:()=>Promise.resolve({})})});
+  await flush();for(let i=0;i<3;i++){f.tick();await flush()}
+  assert.equal(f.get('#start-animation').hidden,false);assert.match(f.get('#start-animation').textContent,/Retry/);
+  fails=false;f.get('#start-animation').fire('click');await flush();
+  assert.match(f.get('#pcb-image-animation').src,/^blob:/);assert.equal(f.get('#start-animation').hidden,true);
 });
 test('an ordinary trusted tap can unlock a browser that requires activation',async()=>{
   const f=fixture({playError:{name:'NotAllowedError'}});await flush();
@@ -145,18 +202,17 @@ test('native playback after a refusal cancels the scheduled retry',async()=>{
   assert.equal(f.timers.has(retry),false);assert.equal(f.get('#start-animation').hidden,true);
   assert.equal(f.video.playCalls,1);assertAssemblyOnly(f);
 });
-test('a stalled load reloads twice before offering manual retry',async()=>{
+test('a stalled video reloads twice before automatically using the image animation',async()=>{
   const f=fixture();await flush();
   for(let i=0;i<2;i++){
     f.tick();await flush();assertAssemblyOnly(f);assert.equal(f.get('#start-animation').hidden,true);
     f.tick();await flush();assert.equal(f.video.loadCalls,i+1);
   }
   f.tick();await flush();
-  assertAssemblyOnly(f);assert.equal(f.get('#start-animation').hidden,false);
+  assertAssemblyOnly(f);assert.equal(f.get('#start-animation').hidden,true);
   assert.equal(f.video.error,null);
-  f.get('#start-animation').fire('click');await flush();
-  assert.equal(f.video.loadCalls,3,'Manual retry reloads even without a MediaError');
-  assert.equal(f.get('#start-animation').hidden,true);
+  assert.match(f.get('#pcb-image-animation').src,/^blob:/);
+  assert.equal(f.video.loadCalls,2);
 });
 test('a temporary media error recovers automatically at the interrupted frame',async()=>{
   const f=fixture();await flush();f.video.currentTime=6;f.video.error={code:2};f.video.fire('error');
@@ -191,11 +247,12 @@ test('an old play rejection after a quick tab switch cannot stop the new attempt
   assert.equal(f.video.paused,false);assert.equal(f.get('#start-animation').hidden,true);
   assert.equal(f.video.loadCalls,0);assertAssemblyOnly(f);
 });
-test('persistent media failures have bounded retries without skipping assembly',async()=>{
+test('persistent media failures have bounded retries then play the image assembly',async()=>{
   const f=fixture({playError:{name:'NotSupportedError'}});await flush();
   for(let i=0;i<2;i++){assert.equal(f.get('#start-animation').hidden,true);f.tick();await flush()}
   assert.equal(f.video.playCalls,3);assert.equal(f.video.loadCalls,2);
-  assert.equal(f.get('#start-animation').hidden,false);assert.equal(f.timers.size,0);assertAssemblyOnly(f);
+  assert.equal(f.get('#start-animation').hidden,true);assert.equal(f.timers.size,0);assertAssemblyOnly(f);
+  assert.match(f.get('#pcb-image-animation').src,/^blob:/);
 });
 test('going into the background cancels a scheduled recovery',async()=>{
   const f=fixture();await flush();f.video.error={code:2};f.video.fire('error');
@@ -208,7 +265,7 @@ test('returning online retries a failed download but preserves gesture requireme
   const blocked=fixture({playError:{name:'NotAllowedError'}});await flush();
   for(let i=0;i<3;i++){blocked.tick();await flush()}
   blocked.fireWindow('online');await flush();assert.equal(blocked.video.playCalls,4);
-  assert.equal(blocked.get('#start-animation').hidden,false);
+  assert.equal(blocked.get('#start-animation').hidden,true);
 });
 test('completion enters idle; a restored page restarts assembly',async()=>{
   const f=fixture();await flush();f.video.currentTime=16;f.video.fire('ended');await flush();

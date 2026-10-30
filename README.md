@@ -52,8 +52,20 @@ The PCB animation was rendered with [Silkreel](https://github.com/hridaya423/sil
 Its license is included in `assets/Silkreel-LICENSE.txt`. IBM Plex Mono is bundled
 locally with its license in `assets/IBM-Plex-Mono-LICENSE.txt`.
 
-The intro enables native muted autoplay only while the tab is visible, and script
-playback waits for enough buffered data. Temporary autoplay refusals retry without
-reloading the video; visibility and focus changes trigger a fresh attempt. Genuine
-browser restrictions retain a manual fallback, and an ordinary trusted tap or key
-can also unlock playback. Startup regression coverage includes these transitions.
+The intro requests muted playback immediately while visible, even before metadata
+loads. Waiting for `canplaythrough` can deadlock mobile preloading. After bounded
+video retries, `image-animation.js` uses the same sequence as a single-pass WebP,
+then animated WebP idle loops. It downloads before starting, creates a fresh blob
+URL for replay, and restarts interrupted assembly on returning to the tab. Image
+fallbacks are loaded only when needed, share cached bytes, and stop off-screen.
+Reduced-motion users retain the static version.
+
+When replacing either MP4, regenerate the matching fallback (FFmpeg with libwebp):
+
+```sh
+ffmpeg -i pcb-reveal.mp4 -vf 'setpts=PTS/1.5,fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 1 pcb-reveal-fallback.webp
+ffmpeg -i pcb-idle.mp4 -vf 'fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 0 pcb-idle-fallback.webp
+```
+
+The intro WebP is 10.666 seconds, played once; the idle WebP loops indefinitely.
+Keep the image player's completion duration aligned if the source timing changes.

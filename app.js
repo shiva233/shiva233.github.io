@@ -22,13 +22,29 @@ let watchdog, recoveryTimer, autoplayTimer, playbackGeneration=0, playAttempt=0,
 let playPending=false, autoplayRetries=0;
 let resumeAt=0, lastPlaybackTime=0, lastBufferedEnd=0, gestureRequired=false;
 let outroOnScreen=false;
+let imagePlayback=false,idleUsesImage=false,outroUsesImage=false;
+const assemblyImage=new PcbImagePlayer(document.querySelector('#pcb-image-animation'),'assets/pcb-reveal-fallback.webp',{
+  duration:10667,onEnd:()=>finishAssembly(true),onError:()=>offerAssemblyStart(true)
+});
+const idleImage=new PcbImagePlayer(document.querySelector('#pcb-idle-image'),'assets/pcb-idle-fallback.webp');
+const outroImage=new PcbImagePlayer(document.querySelector('#outro-idle-image'),'assets/pcb-idle-fallback.webp');
+function playImageAssembly(){
+  if(complete||document.hidden||reducedMotion.matches)return;
+  imagePlayback=true;stopAssemblyPlayback();
+  start.hidden=true;stage.classList.remove('autoplay-blocked');
+  assemblyImage.play();
+}
 function syncOutroPlayback(){
   if(!outroOnScreen||document.hidden||reducedMotion.matches){
-    outroIdle.pause();
+    outroIdle.pause();outroImage.pause();
     if(reducedMotion.matches)outroCard.classList.remove('idle-playing');
     return;
   }
-  if(outroIdle.paused)outroIdle.play().catch(()=>outroCard.classList.remove('idle-playing'));
+  if(imagePlayback||outroUsesImage){outroImage.play();return}
+  if(outroIdle.paused)outroIdle.play().catch(()=>{
+    outroCard.classList.remove('idle-playing');outroUsesImage=true;
+    if(outroOnScreen&&!document.hidden&&!reducedMotion.matches)outroImage.play();
+  });
 }
 function measure(){
   introTop=intro.offsetTop;introTravel=Math.max(1,intro.offsetHeight-stage.offsetHeight);
@@ -48,7 +64,8 @@ function renderScroll(){
   stage.style.setProperty('--cue-opacity',String(1-ease(p/.15)));
   stage.style.setProperty('--bloom',String(ease((p-.24)/.4)));
   stage.style.setProperty('--intro-fade',String(ease((p-.73)/.27)));
-  if(y>=intro.offsetHeight||document.hidden){idle.pause()}
+  if(y>=intro.offsetHeight||document.hidden){idle.pause();idleImage.pause()}
+  else if(complete&&idleUsesImage){idleImage.play()}
   else if(complete&&stage.classList.contains('idle-playing')&&idle.paused){idle.play().catch(()=>{})}
   const q=clamp((y-outroTop)/outroTravel), arrive=ease(q/.8);
   outroStage.style.setProperty('--outro-zoom',String(1+Math.pow(1-arrive,3)*17));
@@ -62,16 +79,21 @@ function schedule(){if(!scheduled){scheduled=true;requestAnimationFrame(renderSc
 function useStill(){stage.classList.add('use-still');stage.classList.remove('idle-playing')}
 async function playIdle(){
   if(reducedMotion.matches||!complete)return;
+  if(imagePlayback||idleUsesImage){idleUsesImage=true;useStill();idleImage.play();return}
   const generation=playbackGeneration;
   try{
     await idle.play();
     const reveal=()=>{if(complete&&generation===playbackGeneration){stage.classList.add('idle-playing');stage.classList.remove('use-still')}};
     if(idle.requestVideoFrameCallback)idle.requestVideoFrameCallback(reveal);else reveal();
-  }catch{useStill()}
+  }catch{
+    if(!complete||generation!==playbackGeneration)return;
+    useStill();idleUsesImage=true;
+    if(!document.hidden)idleImage.play();
+  }
 }
 function finishAssembly(fallback=false){
   if(complete)return;
-  complete=true;stopAssemblyPlayback();
+  complete=true;stopAssemblyPlayback();assemblyImage.pause();
   root.classList.remove('intro-locked');
   stage.classList.remove('autoplay-blocked');stage.classList.add('assembly-ready');
   start.hidden=true;controls.hidden=false;
@@ -81,7 +103,7 @@ function finishAssembly(fallback=false){
   measure();schedule();
 }
 function offerAssemblyStart(retry=false){
-  stopAssemblyPlayback();
+  stopAssemblyPlayback();assemblyImage.pause();
   if(complete)return;
   gestureRequired=!retry;
   start.hidden=false;
@@ -101,34 +123,30 @@ function watchPlayback(){
   if(!complete&&!document.hidden&&start.hidden)watchdog=setTimeout(recoverAssembly,30000);
 }
 function recoverAssembly(){
-  if(complete||document.hidden||recoveryTimer!==undefined||!start.hidden)return;
+  if(imagePlayback||complete||document.hidden||recoveryTimer!==undefined||!start.hidden)return;
   stopAssemblyPlayback();
-  if(recoveryCount>=2){offerAssemblyStart(true);return}
+  if(recoveryCount>=2){playImageAssembly();return}
   recoveryCount++;
   recoveryTimer=setTimeout(()=>{recoveryTimer=undefined;playAssembly(true)},500*recoveryCount);
 }
 function retryAutoplay(){
   clearTimeout(watchdog);
   // A new tab can reject play() before its visibility/layout has settled.
-  // Retry the already buffered video before asking for a browser-required gesture.
+  // Retry the video briefly before switching to the image animation.
   const delays=[250,750,1500];
-  if(autoplayRetries>=delays.length){offerAssemblyStart();return}
+  if(autoplayRetries>=delays.length){playImageAssembly();return}
   autoplayTimer=setTimeout(()=>{autoplayTimer=undefined;playAssembly()},delays[autoplayRetries++]);
 }
-function readyToPlay(){
-  if(video.readyState>=4)return true;
-  return Number.isFinite(video.duration)&&video.buffered.length===1&&
-    video.buffered.start(0)<=.1&&video.buffered.end(video.buffered.length-1)>=video.duration-.1;
-}
 function playWhenReady(){
-  if(!complete&&!document.hidden&&!gestureRequired&&autoplayTimer===undefined&&recoveryTimer===undefined&&readyToPlay())playAssembly();
+  if(!imagePlayback&&!complete&&!document.hidden&&!gestureRequired&&autoplayTimer===undefined&&recoveryTimer===undefined)playAssembly();
 }
 async function playAssembly(reload=false,fromGesture=false){
   if(reducedMotion.matches){finishAssembly(true);return}
+  if(imagePlayback){playImageAssembly();return}
   // Never spend the opening (or its loading timeout) in a background tab.
   if(document.hidden||complete)return;
-  if(playPending&&!reload)return;
-  if(!video.paused&&!reload)return;
+  if(playPending&&!reload&&!fromGesture)return;
+  if(!video.paused&&!reload&&!fromGesture)return;
   const attempt=++playAttempt;
   gestureRequired=false;
   clearTimeout(recoveryTimer);recoveryTimer=undefined;
@@ -143,9 +161,9 @@ async function playAssembly(reload=false,fromGesture=false){
   video.defaultPlaybackRate=1.5;video.playbackRate=1.5;
   start.hidden=true;stage.classList.remove('autoplay-blocked');
   watchPlayback();
-  // Loading a frame is not the same as being ready to play through the intro.
-  // A real gesture may call play immediately so browsers keep that activation.
-  if(!fromGesture&&!readyToPlay())return;
+  // Request playback even at HAVE_NOTHING. Mobile Safari may only preload
+  // metadata until play() is called, so waiting for canplaythrough deadlocks.
+  // The promise stays pending while the browser loads enough data to start.
   playPending=true;
   try{
     await video.play();
@@ -162,6 +180,7 @@ async function playAssembly(reload=false,fromGesture=false){
 }
 function replayAssembly(){
   stopAssemblyPlayback();recoveryCount=0;autoplayRetries=0;gestureRequired=false;
+  assemblyImage.pause();idleImage.pause();
   resumeAt=0;lastPlaybackTime=0;lastBufferedEnd=0;
   playbackGeneration++;complete=false;idle.pause();idle.currentTime=0;
   controls.hidden=true;start.hidden=true;
@@ -177,7 +196,7 @@ video.addEventListener('loadedmetadata',()=>{
 });
 for(const event of ['loadeddata','canplay','canplaythrough'])video.addEventListener(event,playWhenReady);
 video.addEventListener('playing',()=>{
-  if(complete||document.hidden){stopAssemblyPlayback();return}
+  if(imagePlayback||complete||document.hidden){stopAssemblyPlayback();return}
   autoplayRetries=0;gestureRequired=false;
   clearTimeout(autoplayTimer);autoplayTimer=undefined;
   start.hidden=true;stage.classList.remove('autoplay-blocked');watchPlayback();
@@ -188,6 +207,7 @@ video.addEventListener('timeupdate',()=>{
   }
 });
 video.addEventListener('progress',()=>{
+  if(imagePlayback)return;
   // Slow but advancing downloads are healthy, even before Safari can play a frame.
   const end=video.buffered.length?video.buffered.end(video.buffered.length-1):0;
   if(end>lastBufferedEnd){lastBufferedEnd=end;watchPlayback()}
@@ -210,13 +230,14 @@ new IntersectionObserver(([entry])=>{
 replay.addEventListener('click',replayAssembly);
 start.addEventListener('click',()=>{recoveryCount=0;autoplayRetries=0;playAssembly(!gestureRequired,true)});
 function resumeVisibleAssembly(){
+  if(imagePlayback){playImageAssembly();return}
   if(complete||document.hidden||playPending||!video.paused)return;
   autoplayRetries=0;playAssembly();
 }
 // If the browser requires activation, an ordinary tap/key can unlock playback;
 // visitors do not have to find the fallback button specifically.
 function resumeWithGesture(event){
-  if(event.isTrusted&&event.target!==start&&!complete&&!document.hidden&&(gestureRequired||autoplayTimer!==undefined)){
+  if(event.isTrusted&&event.target!==start&&!complete&&!document.hidden&&(gestureRequired||autoplayTimer!==undefined||playPending||video.paused)){
     autoplayRetries=0;playAssembly(false,true);
   }
 }
@@ -234,7 +255,7 @@ addEventListener('pageshow',event=>{
 });
 document.addEventListener('visibilitychange',()=>{
   syncOutroPlayback();
-  if(document.hidden){stopAssemblyPlayback();idle.pause()}
+  if(document.hidden){stopAssemblyPlayback();idle.pause();assemblyImage.pause();idleImage.pause()}
   else if(!complete)resumeVisibleAssembly();
   else schedule();
 });
@@ -248,7 +269,7 @@ new ResizeObserver(()=>{measure();schedule()}).observe(content);
 document.fonts.ready.then(()=>{measure();schedule()});
 reducedMotion.addEventListener('change',()=>{
   syncOutroPlayback();
-  if(reducedMotion.matches){video.pause();idle.pause();if(!complete)finishAssembly(true);useStill()}
+  if(reducedMotion.matches){video.pause();idle.pause();assemblyImage.pause();idleImage.pause();if(!complete)finishAssembly(true);useStill()}
   replay.hidden=reducedMotion.matches;measure();schedule();
 });
 function startNewVisit(){

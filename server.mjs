@@ -10,7 +10,7 @@ createServer((req,res)=>{
  let name;try{name=decodeURIComponent(new URL(req.url,'http://local').pathname)}catch{res.writeHead(400).end();return}
  const file=path.resolve(root,'.'+(name==='/'?'/index.html':name));
  const relative=path.relative(root,file).split(path.sep).join('/');
- const publicFile=['index.html','app.js','styles.css','Shiva_Prakash_Resume_+_Portfolio.pdf'].includes(relative)||relative.startsWith('assets/');
+ const publicFile=['index.html','app.js','image-animation.js','styles.css','Shiva_Prakash_Resume_+_Portfolio.pdf'].includes(relative)||relative.startsWith('assets/');
  if(!file.startsWith(root)||!publicFile||!types[path.extname(file)]){res.writeHead(404).end();return}
  let size;try{const stat=statSync(file);if(!stat.isFile())throw Error();size=stat.size}catch{res.writeHead(404).end();return}
  let start=0,end=size-1;

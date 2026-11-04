@@ -13,7 +13,7 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
     return {
       hidden:true,inert:false,textContent:'',offsetTop:0,offsetHeight:1000,scrollHeight:10000,
       classList:{add:(...names)=>names.forEach(n=>classes.add(n)),remove:(...names)=>names.forEach(n=>classes.delete(n)),contains:n=>classes.has(n),toggle:(n,on)=>on?classes.add(n):classes.delete(n)},
-      style:{setProperty(){}},querySelectorAll:()=>[],
+      style:{setProperty(){}},querySelectorAll:()=>[],focus(){this.focused=true},
       addEventListener:(name,fn)=>events.set(name,[...(events.get(name)||[]),fn]),
       fire(name,event={}){(events.get(name)||[]).forEach(fn=>fn(event));this['on'+name]?.(event)},
       removeAttribute(name){delete this[name]},
@@ -23,13 +23,12 @@ function fixture({hash='',hidden=false,reduced=false,playError=null,playPromise=
       pause(){this.paused=true},load(){this.loadCalls++;this.error=null;this.currentTime=0}
     };
   }
-  const get=selector=>{if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)};
+  const selectors=new Set(['#pcb-video','#pcb-idle','#play-animation','#start-animation','.hero-controls','.intro-stage','#pcb-image-animation','#pcb-idle-image','.skip-link']);
+  const get=selector=>{assert.ok(selectors.has(selector),`Unexpected selector: ${selector}`);if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)};
   const video=get('#pcb-video'),idle=get('#pcb-idle'),root=element();
   video.playError=playError;
   video.playPromise=playPromise;
   video.readyState=readyState;
-  get('#gallery-data').textContent='[]';
-  get('.intro').offsetHeight=2400;get('.outro').offsetTop=8000;
   const doc={hidden,documentElement:root,querySelector:get,querySelectorAll:()=>[],fonts:{ready:Promise.resolve()},
     addEventListener:(name,fn)=>documentEvents.set(name,fn)};
   const location={hash,pathname:'/',search:''};
@@ -286,4 +285,31 @@ test('reduced-motion visitors retain the static fallback',async()=>{
   assert.equal(f.video.playCalls,0);assert.equal(f.idle.playCalls,0);
   assert.equal(f.root.classList.contains('intro-locked'),false);
   assert.equal(f.get('.intro-stage').classList.contains('use-still'),true);
+});
+
+test('contact links appear after assembly without scrolling and hide during replay',async()=>{
+  const f=fixture();await flush();assert.equal(f.get('.hero-controls').hidden,true);
+  f.video.fire('ended');await flush();
+  assert.equal(f.get('.hero-controls').hidden,false);assert.equal(f.context.scrollY,0);
+  assert.equal(f.get('.intro-stage').classList.contains('idle-playing'),true);
+  f.get('#play-animation').fire('click');await flush();
+  assert.equal(f.get('.hero-controls').hidden,true);assert.equal(f.idle.paused,true);
+  assert.equal(f.video.currentTime,0);assert.equal(f.video.paused,false);
+});
+test('the contact screen resumes its idle loop after a tab switch',async()=>{
+  const f=fixture();await flush();f.video.fire('ended');await flush();
+  f.visibility(true);assert.equal(f.idle.paused,true);
+  f.visibility(false);await flush();
+  assert.equal(f.idle.paused,false);assert.equal(f.idle.playCalls,2);
+  assert.equal(f.get('.hero-controls').hidden,false);assert.equal(f.video.playCalls,1);
+});
+test('keyboard skip reveals and focuses the links without waiting for assembly',async()=>{
+  const f=fixture();await flush();f.get('.skip-link').fire('click');await flush();
+  assert.equal(f.get('.hero-controls').hidden,false);assert.equal(f.get('.hero-controls').focused,true);
+  assert.equal(f.video.paused,true);assert.equal(f.root.classList.contains('intro-locked'),false);
+});
+test('reduced-motion visitors can immediately use the contact links',async()=>{
+  const f=fixture({reduced:true});await flush();
+  assert.equal(f.get('.hero-controls').hidden,false);assert.equal(f.get('#play-animation').hidden,true);
+  assert.equal(f.video.playCalls,0);assert.equal(f.idle.playCalls,0);
 });

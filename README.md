@@ -1,17 +1,8 @@
-# Shiva Prakash — portfolio
+# Shiva Prakash — PCB business card
 
-Personal portfolio at [shiva.uwce.ca](https://shiva.uwce.ca), built with HTML, CSS,
-and JavaScript. No framework or runtime dependencies.
-
-The opening PCB assembly plays at 1.5× speed, then continues into an idle loop.
-Scrolling moves through education, experience, projects, and contact details.
-The card returns with the idle loop at the end. Reduced-motion settings receive
-a static opening and normal document scrolling.
-
-The videos use streaming-friendly H.264 at full 1080p resolution. The idle loop
-downloads only after assembly is buffered. Slow downloads keep waiting while
-data arrives; stalled or interrupted playback gets two automatic reload attempts
-before offering a manual retry. Switching tabs invalidates old playback requests.
+A single-screen portfolio: the PCB assembles at 1.5× speed, then keeps hovering
+while résumé, email, LinkedIn, X, and GitHub links fade in. There is no scrolling
+résumé, project gallery, or scroll-driven camera animation.
 
 ## Preview and edit
 
@@ -24,48 +15,54 @@ npm start
 
 Open `http://127.0.0.1:8780/`.
 
-- `src/template.html`: page structure, education, experience, leadership, and skills.
-- `src/content.json`: project descriptions, bullet points, galleries, and contact links.
-- `styles.css`: layout, typography, and responsive styles.
-- `app.js`: animation, scrolling, video playback, and image galleries.
-- `assets/`: videos, project images, fonts, and résumé.
+- `src/template.html`: the business card and contact screen.
+- `src/content.json`: résumé URL, email, and social profile URLs.
+- `styles.css`: responsive layout and typography.
+- `app.js`: assembly, idle playback, replay, and tab visibility handling.
+- `image-animation.js`: animated image fallback for restricted autoplay.
+- `assets/`: animation assets, fonts, licenses, and the existing résumé PDF.
 
-Run `npm run build` after editing the template or content, and commit the generated
-`index.html` along with the source changes.
+Update the résumé URL in `src/content.json` or replace the linked PDF, then rebuild.
+Commit the generated page with source changes. The old project descriptions,
+bullet points, and gallery images are removed; prior versions remain in Git.
 
 ```sh
 npm run check
 npm test
 ```
 
-## Publishing
+## Playback and accessibility
 
-GitHub Pages publishes the repository root on `main`. The generated `index.html`,
-styles, script, and assets are committed, so no build workflow is required.
-`CNAME` keeps the custom domain `shiva.uwce.ca`; `.nojekyll` serves the static files
-directly. The old résumé URL, `Shiva_Prakash_Resume_+_Portfolio.pdf`, remains available
-with the current résumé and portfolio.
+The intro requests muted inline playback immediately while visible, including
+before metadata loads. It waits through advancing downloads and retries stalls.
+Browsers that block video autoplay automatically use the matching single-pass
+animated WebP, followed by an animated WebP idle loop. Image downloads complete
+before their playback clock starts. Replay restarts from the beginning, and
+background tabs pause playback. Refreshes and restored pages restart assembly.
 
-## Credits
+The links remain hidden during assembly. A keyboard-accessible skip button
+reveals them immediately. Reduced-motion visitors get the static card and links;
+visitors without JavaScript get the same usable static contact screen.
 
-The PCB animation was rendered with [Silkreel](https://github.com/hridaya423/silkreel).
-Its license is included in `assets/Silkreel-LICENSE.txt`. IBM Plex Mono is bundled
-locally with its license in `assets/IBM-Plex-Mono-LICENSE.txt`.
-
-The intro requests muted playback immediately while visible, even before metadata
-loads. Waiting for `canplaythrough` can deadlock mobile preloading. After bounded
-video retries, `image-animation.js` uses the same sequence as a single-pass WebP,
-then animated WebP idle loops. It downloads before starting, creates a fresh blob
-URL for replay, and restarts interrupted assembly on returning to the tab. Image
-fallbacks are loaded only when needed, share cached bytes, and stop off-screen.
-Reduced-motion users retain the static version.
-
-When replacing either MP4, regenerate the matching fallback (FFmpeg with libwebp):
+When changing the videos, regenerate their WebP fallbacks with FFmpeg/libwebp:
 
 ```sh
 ffmpeg -i pcb-reveal.mp4 -vf 'setpts=PTS/1.5,fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 1 pcb-reveal-fallback.webp
 ffmpeg -i pcb-idle.mp4 -vf 'fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 0 pcb-idle-fallback.webp
 ```
 
-The intro WebP is 10.666 seconds, played once; the idle WebP loops indefinitely.
-Keep the image player's completion duration aligned if the source timing changes.
+The intro WebP plays once for 10.666 seconds; the idle WebP loops indefinitely.
+Keep the image player's completion duration aligned if source timing changes.
+
+## Credits
+
+The PCB animation was rendered with [Silkreel](https://github.com/hridaya423/silkreel).
+Its license and IBM Plex Mono's license are included with the assets. The site
+uses local fonts and has no analytics, forms, or third-party JavaScript.
+
+## Publishing
+
+GitHub Pages publishes the repository root on `main` at
+[shiva.uwce.ca](https://shiva.uwce.ca). `CNAME` preserves the custom domain and
+`.nojekyll` serves static files directly. The legacy résumé URL,
+`Shiva_Prakash_Resume_+_Portfolio.pdf`, remains available.

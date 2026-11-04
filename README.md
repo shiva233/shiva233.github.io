@@ -1,7 +1,7 @@
 # Shiva Prakash — PCB business card
 
 A single-screen portfolio: the PCB assembles at 1.5× speed, then keeps hovering
-while résumé, email, LinkedIn, X, and GitHub links fade in. There is no scrolling
+while résumé, email, LinkedIn, X, and GitHub links appear. There is no scrolling
 résumé, project gallery, or scroll-driven camera animation.
 
 ## Preview and edit

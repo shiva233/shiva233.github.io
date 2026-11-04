@@ -25,7 +25,7 @@ html.intro-locked,html.intro-locked body{overflow:hidden;overscroll-behavior:non
 .idle-playing #pcb-video,.use-still #pcb-video{opacity:0}
 .use-still .card-still{opacity:1}
 .pcb-image-animation{z-index:1}
-.hero-controls{position:absolute;inset:0;pointer-events:none;animation:appear .9s both}
+.hero-controls{position:absolute;inset:0;z-index:3;pointer-events:none}
 .hero-controls a,.hero-controls button{pointer-events:auto}
 .js .intro-stage:not(.assembly-ready) .hero-controls{visibility:hidden}
 .hero-controls h1{position:absolute;top:max(50px,10svh);left:24px;right:24px;margin:0;text-align:center;font-size:clamp(19px,2.3vw,30px);font-weight:300;letter-spacing:-.055em;line-height:1.4}
@@ -42,7 +42,6 @@ html.intro-locked,html.intro-locked body{overflow:hidden;overscroll-behavior:non
 footer{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:20px;right:20px;text-align:center;font-size:9px;font-weight:300;color:#858585}
 footer a{display:inline-flex;align-items:center;min-height:44px;gap:6px}
 .start-animation{position:absolute;bottom:12svh;left:50%;transform:translateX(-50%);min-height:44px;padding:12px 18px;font-size:12px;color:#bbb}
-@keyframes appear{from{opacity:0}to{opacity:1}}
 @media(max-width:600px){
   .card-media{width:120vw;top:40%}
   .hero-controls h1{top:max(48px,10svh)}

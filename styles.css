@@ -15,7 +15,7 @@ html.intro-locked,html.intro-locked body{overflow:hidden;overscroll-behavior:non
 .js .skip-link{display:block}
 .skip-link:focus{top:15px}
 .intro-stage{position:relative;height:100svh;min-height:640px;overflow:hidden;isolation:isolate}
-.card-media{width:min(840px,112vw);aspect-ratio:16/9;position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);pointer-events:none;transition:top 1.2s ease,width 1.2s ease}
+.card-media{width:min(840px,112vw);aspect-ratio:16/9;position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);pointer-events:none;transition:top 1.6s cubic-bezier(.22,.7,.25,1),width 1.6s cubic-bezier(.22,.7,.25,1)}
 .js .intro-stage:not(.assembly-ready) .card-media{width:min(1180px,112vw);top:48%}
 .card-media video,.card-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
 .card-media video{opacity:0}
@@ -30,29 +30,30 @@ html.intro-locked,html.intro-locked body{overflow:hidden;overscroll-behavior:non
 .js .intro-stage:not(.assembly-ready) .hero-controls{visibility:hidden}
 .hero-controls h1{position:absolute;top:max(50px,10svh);left:24px;right:24px;margin:0;text-align:center;font-size:clamp(19px,2.3vw,30px);font-weight:300;letter-spacing:-.055em;line-height:1.4}
 .contact{position:absolute;bottom:max(65px,9svh);left:20px;right:20px;text-align:center}
-.email-link{display:inline-flex;align-items:center;min-height:44px;gap:12px;font-size:clamp(12px,1.5vw,17px)}
-.contact-links{display:flex;justify-content:center;align-items:center;gap:28px;margin-top:20px;font-size:12px}
-.resume-button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 20px;border:1px solid #555;gap:20px;transition:border-color .2s,background .2s}
-.resume-button:hover{border-color:#eee;background:#111}
-.social-links{display:flex;align-items:center;gap:24px}
-.social-links a{display:inline-flex;align-items:center;gap:9px;min-height:44px;color:#bbb}
-.social-links a:hover{color:#fff}
-#play-animation{min-height:44px;padding:10px 14px;margin-top:18px;color:#969696;font-size:10px;font-weight:300;letter-spacing:.02em}
-#play-animation:hover{color:#eee}
-footer{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:20px;right:20px;text-align:center;font-size:9px;font-weight:300;color:#858585}
-footer a{display:inline-flex;align-items:center;min-height:44px;gap:6px}
+.contact-links{display:flex;justify-content:center;gap:8px;max-width:680px;margin:0 auto;font-size:12px}
+.contact-links a{display:inline-flex;align-items:center;justify-content:center;gap:14px;min-height:46px;padding:10px 20px;border:1px solid #383838;color:#c2c2c2;transition:color .2s,border-color .2s,background .2s}
+.contact-links a:hover{color:#fff;border-color:#999;background:#141414}
+.contact-links .resume-button{color:#080808;background:#eee;border-color:#eee}
+.contact-links .resume-button:hover{color:#000;background:#fff;border-color:#fff}
+.closing-actions{display:flex;flex-direction:column;align-items:center;margin-top:20px}
+.secondary-link{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:9px 12px;font-size:11px;font-weight:300;line-height:1.6;letter-spacing:.02em;color:#aaa;transition:color .2s}
+.secondary-link:hover{color:#eee}
+.assembly-ready .greeting{animation:reveal 1.2s cubic-bezier(.22,.7,.25,1) .15s backwards}
+.assembly-ready .contact-links{animation:reveal 1.2s cubic-bezier(.22,.7,.25,1) .35s backwards}
+.assembly-ready .closing-actions{animation:reveal 1.2s cubic-bezier(.22,.7,.25,1) .55s backwards}
+@keyframes reveal{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .start-animation{position:absolute;bottom:12svh;left:50%;transform:translateX(-50%);min-height:44px;padding:12px 18px;font-size:12px;color:#bbb}
-@media(max-width:600px){
-  .card-media{width:120vw;top:40%}
+@media(max-width:640px){
+  .card-media{width:min(120vw,80svh);top:40%}
   .hero-controls h1{top:max(48px,10svh)}
   .contact{bottom:max(68px,9svh)}
-  .contact-links{flex-direction:column;gap:10px;margin-top:16px}
-  .social-links{gap:28px}
-  #play-animation{margin-top:5px}
+  .contact-links{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));max-width:420px}
+  .contact-links a{grid-column:span 2;padding:10px 12px;font-size:11px;gap:9px}
+  .contact-links a:nth-child(-n+2){grid-column:span 3}
 }
 @media(max-height:650px){
   .intro-stage{min-height:640px}
-  .card-media{width:min(620px,110vw);top:37%}
+  .card-media{width:min(620px,90vw);top:34%}
   .hero-controls h1{top:32px}
   .contact{bottom:62px}
 }

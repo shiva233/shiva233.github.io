@@ -3,8 +3,8 @@ const root = document.documentElement;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const stage = document.querySelector('.intro-stage');
 const video = document.querySelector('#pcb-video');
-video.defaultPlaybackRate = 1.5;
-video.playbackRate = 1.5;
+video.defaultPlaybackRate = 2.25;
+video.playbackRate = 2.25;
 const idle = document.querySelector('#pcb-idle');
 const replay = document.querySelector('#play-animation');
 const start = document.querySelector('#start-animation');
@@ -14,8 +14,8 @@ let watchdog, recoveryTimer, autoplayTimer, playbackGeneration=0, playAttempt=0,
 let playPending=false, autoplayRetries=0;
 let resumeAt=0, lastPlaybackTime=0, lastBufferedEnd=0, gestureRequired=false;
 let imagePlayback=false,idleUsesImage=false;
-const assemblyImage=new PcbImagePlayer(document.querySelector('#pcb-image-animation'),'assets/pcb-reveal-fallback.webp',{
-  duration:10667,onEnd:()=>finishAssembly(true),onError:()=>offerAssemblyStart(true)
+const assemblyImage=new PcbImagePlayer(document.querySelector('#pcb-image-animation'),'assets/pcb-reveal-fallback.webp?v=2',{
+  duration:7124,onEnd:()=>finishAssembly(true),onError:()=>offerAssemblyStart(true)
 });
 const idleImage=new PcbImagePlayer(document.querySelector('#pcb-idle-image'),'assets/pcb-idle-fallback.webp');
 function playImageAssembly(){
@@ -105,7 +105,7 @@ async function playAssembly(reload=false,fromGesture=false){
     resumeAt=Math.max(resumeAt,video.currentTime||0);
     lastBufferedEnd=0;video.load();
   }
-  video.defaultPlaybackRate=1.5;video.playbackRate=1.5;
+  video.defaultPlaybackRate=2.25;video.playbackRate=2.25;
   start.hidden=true;stage.classList.remove('autoplay-blocked');
   watchPlayback();
   // Request playback even at HAVE_NOTHING. Mobile Safari may only preload

@@ -1,7 +1,8 @@
 # Shiva Prakash — PCB business card
 
-A single-screen portfolio: the PCB assembles at 1.5× speed, then keeps hovering
-while résumé, email, LinkedIn, X, and GitHub links appear. There is no scrolling
+A single-screen portfolio: the PCB assembles at 2.25× speed (about 7.1 seconds), then keeps hovering
+while Email, résumé, LinkedIn, X, and GitHub buttons ease in. The résumé is
+highlighted; Replay and the Silkreel credit sit together below the buttons. There is no scrolling
 résumé, project gallery, or scroll-driven camera animation.
 
 ## Preview and edit
@@ -47,11 +48,11 @@ visitors without JavaScript get the same usable static contact screen.
 When changing the videos, regenerate their WebP fallbacks with FFmpeg/libwebp:
 
 ```sh
-ffmpeg -i pcb-reveal.mp4 -vf 'setpts=PTS/1.5,fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 1 pcb-reveal-fallback.webp
+ffmpeg -i pcb-reveal.mp4 -vf 'setpts=PTS/2.25,fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 1 pcb-reveal-fallback.webp
 ffmpeg -i pcb-idle.mp4 -vf 'fps=24,scale=960:-1:flags=lanczos' -an -c:v libwebp_anim -quality 78 -compression_level 4 -loop 0 pcb-idle-fallback.webp
 ```
 
-The intro WebP plays once for 10.666 seconds; the idle WebP loops indefinitely.
+The intro WebP plays once for 7.124 seconds; the idle WebP loops indefinitely.
 Keep the image player's completion duration aligned if source timing changes.
 
 ## Credits

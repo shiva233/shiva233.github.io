@@ -61,7 +61,7 @@ for(const hash of ['', '#about', '#projects', '#contact']){
   test(`fresh visit ${hash||'/'} starts assembly at the top`,async()=>{
     const f=fixture({hash});await flush();
     assertAssemblyOnly(f);assert.equal(f.video.playCalls,1);
-    assert.equal(f.video.currentTime,0);assert.equal(f.video.playbackRate,1.5);
+    assert.equal(f.video.currentTime,0);assert.equal(f.video.playbackRate,2.25);
     assert.equal(f.context.scrollY,0);assert.equal(f.location.hash,'');
     assert.equal(f.history.scrollRestoration,'manual');
   });
@@ -218,7 +218,7 @@ test('a temporary media error recovers automatically at the interrupted frame',a
   assertAssemblyOnly(f);assert.equal(f.get('#start-animation').hidden,true);
   f.tick();await flush();f.video.fire('loadedmetadata');
   assert.equal(f.video.error,null);assert.equal(f.video.paused,false);assertAssemblyOnly(f);
-  assert.equal(f.video.currentTime,6);assert.equal(f.video.playbackRate,1.5);
+  assert.equal(f.video.currentTime,6);assert.equal(f.video.playbackRate,2.25);
 });
 test('slow download progress keeps waiting instead of showing retry',async()=>{
   const f=fixture({playPromise:new Promise(()=>{})});await flush();
@@ -312,4 +312,21 @@ test('reduced-motion visitors can immediately use the contact links',async()=>{
   const f=fixture({reduced:true});await flush();
   assert.equal(f.get('.hero-controls').hidden,false);assert.equal(f.get('#play-animation').hidden,true);
   assert.equal(f.video.playCalls,0);assert.equal(f.idle.playCalls,0);
+});
+
+test('the mobile image fallback finishes on its last encoded frame at the new speed',()=>{
+  const bytes=readFileSync(new URL('../assets/pcb-reveal-fallback.webp',import.meta.url));
+  assert.equal(bytes.toString('ascii',8,12),'WEBP');
+  let milliseconds=0,frames=0,loops;
+  for(let offset=12;offset+8<=bytes.length;){
+    const tag=bytes.toString('ascii',offset,offset+4),size=bytes.readUInt32LE(offset+4);
+    if(tag==='ANMF'){milliseconds+=bytes.readUIntLE(offset+20,3);frames++}
+    if(tag==='ANIM')loops=bytes.readUInt16LE(offset+12);
+    offset+=8+size+(size%2);
+  }
+  const f=fixture({hidden:true});
+  assert.ok(frames>100);assert.equal(loops,1,'Assembly should play once');
+  assert.equal(vm.runInContext('assemblyImage.duration',f.context),milliseconds);
+  assert.ok(Math.abs(milliseconds-f.video.duration/f.video.playbackRate*1000)<1000/24,
+    'Image and video assembly should finish within one frame of each other');
 });
